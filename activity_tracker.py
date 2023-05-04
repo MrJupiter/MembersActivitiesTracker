@@ -5,11 +5,14 @@ from discord.ext import commands
 from discord.utils import get
 from keep_alive import keep_alive
 
-SUPPORTED_ROLES = ["Apex Legends", "VALORANT", "Among Us", "PICO PARK", "Call of Duty", "League Of Legends", "Call of War", "Fifa"]
+SUPPORTED_ROLES = ["Apex Legends", "Valorant", "Among Us", "Pico Park", "Call Of Duty", "League Of Legends", "Counter-Strike", "Fifa", "Fortnite", "Rainbow Six Siege", "Grand Theft Auto", "Red Dead Redemption"]
 
 supported_roles_list = list(map(lambda x: x.title(), SUPPORTED_ROLES))
 
 COMMAND_CHOICES = []
+
+LEGIT_SERVERS_ID = [828417721745014784, 1092836175405928478]
+LEGIT_CHANNELS_ID = [1103065600735051797, 1103784396634472528]
 
 def getGameActivity(activities):
   game_activity = ""
@@ -64,14 +67,11 @@ def run_discord_bot():
     except Exception as e:
       print(e)
   #----------------------------------------------------------------------------------------------------------------------------
-  def check_server_id(interaction: discord.Interaction) -> bool:
-    return interaction.guild_id == 828417721745014784
-    
+  
   # Update roles due to actual activity (Games only)
   @bot.event
-  @app_commands.check(check_server_id)
   async def on_presence_update(before, after):
-    
+    if before.guild.id in LEGIT_SERVERS_ID:
       # When a member logged out
       if str(after.status) == discord.Status.offline:
         for game in supported_roles_list:
@@ -81,7 +81,7 @@ def run_discord_bot():
       
       before_activities = getGameActivity(before.activities)
       after_activities = getGameActivity(after.activities)
-
+      print(f"{before.name} from {before.guild.name} switched from {before.activities} to {after.activities}")
       # When a member had no activity but just launched a game
       if before_activities == "" and after_activities != "":
         await add_role(after_activities, after)
@@ -96,52 +96,54 @@ def run_discord_bot():
         await remove_role(before_activities, after)
   
   #----------------------------------------------------------------------------------------------------------------------------
-  async def is_legit(ctx: discord.Interaction):
-    return ctx.channel_id == 1103065600735051797 and ctx.guild_id == 828417721745014784
-
   async def isnt_legit_message(ctx: discord.Interaction):
-    if ctx.guild_id  != 828417721745014784 or  ctx.channel_id != 1103065600735051797:
-      await ctx.response.send_message(f"You must execute the command in <#1103065600735051797>", ephemeral = True) 
+    index = LEGIT_SERVERS_ID.index(ctx.guild_id)
+    if index >= 0:
+      if ctx.channel_id != LEGIT_CHANNELS_ID[index]:
+        await ctx.response.send_message(f"You must execute the command in <#{LEGIT_CHANNELS_ID[index]}>", ephemeral = True) 
     
   # Bot Slash Command lfg using games' roles
   @bot.tree.command(name="lfg", description = "Send DM to all members playing a given game")
   @app_commands.describe(game = "Choose a game")
   @app_commands.choices(game = COMMAND_CHOICES)
   async def lfg(ctx: discord.Interaction, game: discord.app_commands.Choice[int]):
-    if await is_legit(ctx):
-      role = discord.utils.get(ctx.guild.roles,name="Now " + game.name)
-      # Check if author is in a voice channel
-      if ctx.user.voice is None:
-        await ctx.response.send_message("Join a voice channel and retry!", ephemeral = True)
-        return
-      counter = 0
-      # Iterate on all members with a given role
-      for member in role.members:
-        # Never send a message to the author
-        if member.id != ctx.user.id:
-          await member.send(f"{ctx.user.mention} is looking for a team to play **{str(role.name).replace('Now ', '')}** on **{str(ctx.guild.name)}** Server. You can join him here: <#{ctx.user.voice.channel.id}>")
-          counter = counter + 1
-      if counter > 0:
-        await ctx.response.send_message(f"I've just sent a DM to all server's members that are playing **{str(role.name).replace('Now ', '')}** : {counter} member(s)", ephemeral = True)
-      else: 
-        await ctx.response.send_message(f"Sorry to tell you that no one is actually playing **{str(role.name).replace('Now ', '')}**...", ephemeral = True)
+    if ctx.guild_id in LEGIT_SERVERS_ID:
+      if ctx.channel_id in LEGIT_CHANNELS_ID:
+        role = discord.utils.get(ctx.guild.roles,name="Now " + game.name)
+        # Check if author is in a voice channel
+        if ctx.user.voice is None:
+          await ctx.response.send_message("Join a voice channel and retry!", ephemeral = True)
+          return
+        counter = 0
+        # Iterate on all members with a given role
+        for member in role.members:
+          # Never send a message to the author
+          if member.id != ctx.user.id:
+            await member.send(f"{ctx.user.mention} is looking for a team to play **{str(role.name).replace('Now ', '')}** on **{str(ctx.guild.name)}** Server. You can join him here: <#{ctx.user.voice.channel.id}>")
+            counter = counter + 1
+        if counter > 0:
+          await ctx.response.send_message(f"I've just sent a DM to all server's members that are playing **{str(role.name).replace('Now ', '')}** : {counter} member(s)", ephemeral = True)
+        else: 
+          await ctx.response.send_message(f"Sorry to tell you that no one is actually playing **{str(role.name).replace('Now ', '')}**...", ephemeral = True)
+      else:
+        await isnt_legit_message(ctx)
     else:
-      await isnt_legit_message(ctx)
+      await ctx.response.send_message("Sorry to tell that you need to be in the legit servers' list to use this bot... Please, contact <@583461272046141585> to add your discord server in the legit list", ephemeral = True)
   #----------------------------------------------------------------------------------------------------------------------------
   def check_if_it_is_me(interaction: discord.Interaction) -> bool:
     return interaction.user.id == 583461272046141585
   @bot.tree.command(name="remove_all_roles", description = "Remove Now Game roles from all members")
   @app_commands.check(check_if_it_is_me)
   async def remove_all_roles(ctx: discord.Interaction):
-    if await is_legit(ctx):
+    if ctx.guild_id in LEGIT_SERVERS_ID:
       for rolestr in supported_roles_list:
-        role = discord.utils.get(ctx.guild.roles,name="Now " + rolestr)
+        role = discord.utils.get(ctx.guild.roles, name="Now " + rolestr)
         for member in role.members:
           await remove_role(rolestr, member)
-      await ctx.response.send_message(f"Removed the role 'Now Game' roles from all members", ephemeral = True)
+      await ctx.response.send_message("Removed the role 'Now Game' roles from all members", ephemeral = True)
     else:
-      await isnt_legit_message(ctx)
-    
+      await ctx.response.send_message("Sorry to tell that you need to be in the legit servers' list to use this bot... Please, contact <@583461272046141585> to add your discord server in the legit list", ephemeral = True)
+      
   # HTTP Server persistent
   keep_alive()
   
