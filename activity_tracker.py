@@ -61,7 +61,7 @@ def getGameActivity(activities):
       activity_name = activity
       if activity.name is not None:
         activity_name.name
-      index = getIndexOfElementContainedInString(supported_roles_list, str(activity_name.title()))
+      index = getIndexOfElementContainedInString(supported_roles_list, str(activity_name).title())
       if index >= 0 and str(activity.type) == "ActivityType.playing":
         #print(activity.name)
         game_activity = supported_roles_list[index]
@@ -205,14 +205,13 @@ def run_discord_bot():
       else:
         await ctx.response.send_message(f"You must execute the command in <#{LEGIT_ID.get(ctx.guild_id)[0]}>", ephemeral = True)
   
-
   #----------------------------------------------------------------------------------------------------------------------------
-
-  @bot.tree.command(name="remove_all_roles", 
+  
+  @bot.tree.command(name="remove_now_roles_from_member", 
                     description = "Remove Now Game roles from all members")
   @app_commands.checks.has_permissions(administrator = True)
   @legit_guilds()
-  async def remove_all_roles(ctx: discord.Interaction):
+  async def remove_now_roles_from_member(ctx: discord.Interaction):
       response_txt = ""
       for rolestr in supported_roles_list:
         role = discord.utils.get(ctx.guild.roles, name="Now " + rolestr)
@@ -226,6 +225,29 @@ def run_discord_bot():
       await logs_channel.send(f"{ctx.user.mention} used /remove_all_roles\n{response_txt}")
       await ctx.response.send_message(f"Check <#{LEGIT_ID.get(ctx.guild_id)[1]}>", ephemeral = True)
 
+  
+  @bot.tree.command(name="add_now_roles", 
+                    description = "Add Now Game roles to the server")
+  @app_commands.checks.has_permissions(administrator = True)
+  @legit_guilds()
+  async def add_now_roles(ctx: discord.Interaction):
+    for srole in supported_roles_list:
+      role = get(ctx.guild.roles, name="Now " + srole)
+      if not role:
+        await ctx.guild.create_role(name="Now " + srole, colour=discord.Colour(0x511229))
+    await ctx.response.send("Added successfully all the Now roles", ephemeral = True)
+    
+  @bot.tree.command(name="delete_now_roles", 
+                      description = "Delete Now Game roles to the server")
+  @app_commands.checks.has_permissions(administrator = True)
+  @legit_guilds()
+  async def delete_now_roles(ctx: discord.Interaction):
+    for rolestr in supported_roles_list:
+      role = discord.utils.get(ctx.guild.roles, name="Now " + rolestr)
+      if role is not None:
+        await role.delete()
+    await ctx.response.send("Removed successfully all the Now roles", ephemeral = True)  
+  
   # HTTP Server persistent
   keep_alive()
   
