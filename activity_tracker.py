@@ -104,6 +104,12 @@ def run_discord_bot():
         await remove_role(before_activities, after)
   
   #----------------------------------------------------------------------------------------------------------------------------   
+  # Creating an app_commands.check
+  def legit_guilds():
+    def predicate(interaction: discord.Interaction) -> bool:
+        return interaction.guild_id in list(LEGIT_ID.keys())
+    return app_commands.check(predicate)
+    
   # Bot Slash Command lfg using games' roles
   @bot.tree.command(name="lfg", description = "Send DM to all members playing a given game")
   @app_commands.describe(game = "Choose a game")
@@ -113,8 +119,8 @@ def run_discord_bot():
     discord.app_commands.Choice(name='Ranked', value=1),
     discord.app_commands.Choice(name='Casual', value=2),
   ])
+  @legit_guilds()
   async def lfg(ctx: discord.Interaction, game: discord.app_commands.Choice[int], mode: discord.app_commands.Choice[int] = None):
-    if ctx.guild_id in list(LEGIT_ID.keys()):
       # Check if author is in a voice channel
       if ctx.user.voice is None:
         await ctx.response.send_message("Join a voice channel and retry!", ephemeral = True)
@@ -150,15 +156,18 @@ def run_discord_bot():
           await ctx.response.send_message("This game doesn't support ranked", ephemeral = True)
       else:
         await ctx.response.send_message(f"You must execute the command in <#{LEGIT_ID.get(ctx.guild_id)[0]}>", ephemeral = True)
-    else:
-      await ctx.response.send_message("Sorry to tell that you need to be in the legit servers' list to use this bot... Please, contact <@583461272046141585> to add your discord server in the legit list", ephemeral = True)
+  
+  @lfg.error
+  async def lfg_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.CheckFailure):
+        await interaction.response.send_message("Sorry to tell that you need to be in the legit servers' list to use this bot... Please, contact <@583461272046141585> to add your discord server in the legit list", ephemeral=True)
   #----------------------------------------------------------------------------------------------------------------------------
 
   @bot.tree.command(name="remove_all_roles", 
                     description = "Remove Now Game roles from all members")
   @app_commands.checks.has_any_role("Admin")
+  @legit_guilds()
   async def remove_all_roles(ctx: discord.Interaction):
-    if ctx.guild_id in list(LEGIT_ID.keys()):
       response_txt = ""
       for rolestr in supported_roles_list:
         role = discord.utils.get(ctx.guild.roles, name="Now " + rolestr)
@@ -171,13 +180,14 @@ def run_discord_bot():
       logs_channel = bot.get_channel(LEGIT_ID.get(ctx.guild_id)[1])
       await logs_channel.send(f"{ctx.user.mention} used /remove_all_roles\n{response_txt}")
       await ctx.response.send_message(f"Check <#{LEGIT_ID.get(ctx.guild_id)[1]}>", ephemeral = True)
-    else:
-      await ctx.response.send_message("Sorry to tell that you need to be in the legit servers' list to use this bot... Please, contact <@583461272046141585> to add your discord server in the legit list", ephemeral = True)
 
   @remove_all_roles.error
   async def remove_all_roles_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
     if isinstance(error, app_commands.MissingAnyRole):
         await interaction.response.send_message(str(error), ephemeral=True)
+    if isinstance(error, app_commands.CheckFailure):
+        await interaction.response.send_message("Sorry to tell that you need to be in the legit servers' list to use this bot... Please, contact <@583461272046141585> to add your discord server in the legit list", ephemeral=True)
+  
   # HTTP Server persistent
   keep_alive()
   
