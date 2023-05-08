@@ -244,7 +244,7 @@ def run_discord_bot():
   @app_commands.checks.has_permissions(administrator = True)
   @legit_guilds()
   async def delete_now_roles(interaction: discord.Interaction):
-    await interaction.response.defer()
+    await interaction.response.defer(ephemeral = True)
     for rolestr in supported_roles_list:
       role = discord.utils.get(interaction.guild.roles, name="Now " + rolestr)
       if role is not None:
