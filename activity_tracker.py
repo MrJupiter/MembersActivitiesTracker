@@ -17,42 +17,41 @@ RANKED_GAMES = list(map(lambda x: x.title(), ["Apex Legends",
 
 RANKED_MATRIX = {
   "Apex Legends" : [
-    discord.app_commands.Choice(name="Rookie", value=1),
-    discord.app_commands.Choice(name="Bronze", value=2), 
-    discord.app_commands.Choice(name="Silver", value=3), 
-    discord.app_commands.Choice(name="Gold", value=4), 
-    discord.app_commands.Choice(name="Platinium", value=5), 
-    discord.app_commands.Choice(name="Diamond", value=6), 
-    discord.app_commands.Choice(name="Master", value=7), 
-    discord.app_commands.Choice(name="Predator", value=8)
+    "Rookie",
+    "Bronze",
+    "Silver",
+    "Gold",
+    "Platinium",
+    "Diamond",
+    "Master",
+    "Predator"
   ],
   "Valorant" : [
-    discord.app_commands.Choice(name="Iron", value=1),
-    discord.app_commands.Choice(name="Bronze", value=2), 
-    discord.app_commands.Choice(name="Silver", value=3), 
-    discord.app_commands.Choice(name="Gold", value=4), 
-    discord.app_commands.Choice(name="Platinium", value=5), 
-    discord.app_commands.Choice(name="Diamond", value=6), 
-    discord.app_commands.Choice(name="Ascendant", value=7), 
-    discord.app_commands.Choice(name="Immortal", value=8), 
-    discord.app_commands.Choice(name="Radiant", value=9)
+    "Iron",
+    "Bronze",
+    "Silver",
+    "Gold",
+    "Platinium",
+    "Diamond",
+    "Ascendant",
+    "Immortal",
+    "Radiant"
   ],
   "Call Of Duty" : [
-    discord.app_commands.Choice(name="Bronze", value=1), 
-    discord.app_commands.Choice(name="Silver", value=2), 
-    discord.app_commands.Choice(name="Gold", value=3), 
-    discord.app_commands.Choice(name="Platinium", value=4), 
-    discord.app_commands.Choice(name="Diamond", value=5), 
-    discord.app_commands.Choice(name="Crimson", value=6), 
-    discord.app_commands.Choice(name="Iridescent", value=7),
-    discord.app_commands.Choice(name="Top 250", value=8)
+    "Bronze",
+    "Silver", 
+    "Gold",
+    "Platinium",
+    "Diamond",
+    "Crimson",
+    "Iridescent",
+    "Top 250"
   ]
 }
 LEGIT_ID = {
   #server_id: [commands_channel_id, logs_channel_id]
   828417721745014784: [1103065600735051797, 1103821924418728046],
-  1092836175405928478: [1103784396634472528, 1103822302572974190],
-  1102712499624747081: [1102712500245516341, 1104207625295503370]
+  1092836175405928478: [1103784396634472528, 1103822302572974190]
 }
 
 def getGameActivity(activities):
@@ -80,7 +79,7 @@ def getIndexOfElementContainedInString(str_list, str):
 # Used to create app_commands.choices list -> COMMAND_CHOICES
 def addCommandChoice():
   for role in supported_roles_list:
-    GAMES_CHOICES.append(discord.app_commands.Choice(name=str(role), value=supported_roles_list.index(role)))
+    GAMES_CHOICES.append(discord.app_commands.Choice(name=str(role), value=str(role)))
 
 # Used to add a role from supported_roles_list
 async def add_role(rolestr, member):
@@ -104,15 +103,37 @@ def run_discord_bot():
   # When the discord bot is up sync the new tree command and create COMMAND_CHOICES
   @bot.event
   async def on_ready():
-    print("Bot is Up")
+    print(f'We have logged in as {bot.user} in {len(bot.guilds)} servers')
     addCommandChoice()
     try:
       synced = await bot.tree.sync()
       print(f"Synced {len(synced)} command(s)")
+      return
     except Exception as e:
       print(e)
-  #----------------------------------------------------------------------------------------------------------------------------
   
+  #----------------------------------------------------------------------------------------------------------------------------
+  # Creating an app_commands.check
+  class NotLegitServer(app_commands.CheckFailure):
+    pass
+  def legit_guilds():
+    async def predicate(interaction):
+        if interaction.guild_id not in list(LEGIT_ID.keys()):
+            raise NotLegitServer("Sorry to tell that you need to be in the legit servers' list to use this bot... Please, contact <@583461272046141585> to add your discord server in the legit list")
+        return True
+    return app_commands.check(predicate)
+
+  def legit_channels():
+    async def predicate(interaction):
+        if interaction.channel_id != LEGIT_ID.get(interaction.guild_id)[0]:
+            raise NotLegit(f"Execute your command in <#{LEGIT_ID.get(interaction.guild_id)[0]}>")
+        return True
+    return app_commands.check(predicate)
+    
+  @bot.tree.error
+  async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
+    await interaction.response.send_message(str(error), ephemeral=True)
+    
   # Update roles due to actual activity (Games only)
   @bot.event
   async def on_presence_update(before, after):
@@ -126,7 +147,6 @@ def run_discord_bot():
       
       before_activities = getGameActivity(before.activities)
       after_activities = getGameActivity(after.activities)
-      #print(f"{before.name} from {before.guild.name} switched from {before.activities} to {after.activities}")
       # When a member had no activity but just launched a game
       if before_activities == "" and after_activities != "":
         await add_role(after_activities, after)
@@ -141,76 +161,77 @@ def run_discord_bot():
         await remove_role(before_activities, after)
   
   #----------------------------------------------------------------------------------------------------------------------------   
-  # Creating an app_commands.check
-  class NotLegitServer(app_commands.CheckFailure):
-    pass
-  def legit_guilds():
-    async def predicate(interaction):
-        if interaction.guild_id not in list(LEGIT_ID.keys()):
-            raise NotLegitServer("Sorry to tell that you need to be in the legit servers' list to use this bot... Please, contact <@583461272046141585> to add your discord server in the legit list")
-        return True
-    return app_commands.check(predicate)
-
-  @bot.tree.error
-  async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
-    await interaction.response.send_message(str(error), ephemeral=True)
+  async def rank_autocompletion(interaction: discord.Interaction, rank : str) -> list[app_commands.Choice[str]]:
+    data = []
+    if interaction.namespace.mode == "Ranked":
+      for rank_choice in RANKED_MATRIX[interaction.namespace.game]:
+        if rank.lower() in rank_choice.lower():
+          data.append(app_commands.Choice(name=rank_choice, value=rank_choice))
+    return data
     
   # Bot Slash Command lfg using games' roles
   @bot.tree.command(name="lfg", description = "Send DM to all members playing a given game")
   @app_commands.describe(
     game = "Choose a game",
-    mode = "Choose a mode"
+    mode = "Choose a mode",
+    rank = "Your rank"
   )
   @app_commands.choices(
     game = GAMES_CHOICES,
     mode = [
-    discord.app_commands.Choice(name='Ranked', value=1),
-    discord.app_commands.Choice(name='Casual', value=2),
+    discord.app_commands.Choice(name='Ranked', value='Ranked'),
+    discord.app_commands.Choice(name='Casual', value='Casual'),
     ]
   )
+  @app_commands.autocomplete(rank = rank_autocompletion)
+  @legit_channels()
   @legit_guilds()
-  async def lfg(interaction: discord.Interaction, game: discord.app_commands.Choice[int], mode: discord.app_commands.Choice[int] = None):
-      # Check if author is in a voice channel
-      if interaction.user.voice is None:
-        await interaction.response.send_message("Join a voice channel and retry!", ephemeral = True)
-        return
-      elif interaction.channel_id == LEGIT_ID.get(interaction.guild_id)[0]:
-        legit_cmd_mode = True
-        mode_name = "Casual"
-        if mode != None:
-          mode_name = mode.name
-          if (mode.value == 1 and game.name not in RANKED_GAMES):
-            legit_cmd_mode = False
+  async def lfg(interaction: discord.Interaction, game: discord.app_commands.Choice[str], mode: discord.app_commands.Choice[str], rank: str = None):
+    # Check if author is in a voice channel
+    if interaction.user.voice is None:
+      await interaction.response.send_message("Join a voice channel and retry!", ephemeral = True)
+      return
+    else:
+      legit_cmd_mode = True
+      if mode.name == "Ranked" and game.name not in RANKED_GAMES:
+        legit_cmd_mode = False
           
-        if legit_cmd_mode:
-          role = discord.utils.get(interaction.guild.roles,name="Now " + game.name)
-          if role:
-            counter = 0
-            # Iterate on all members with a given role
-            for member in role.members:
-              # Never send a message to the author
-              if member.id != interaction.user.id:
-                await member.send(f"{interaction.user.mention} is looking for a team to play **{mode_name}** in **{game.name} ** on **{str(interaction.guild.name)}** Server. You can join him here: <#{interaction.user.voice.channel.id}>")  
-                counter = counter + 1
-            if counter > 0:
-              await interaction.response.send_message(f"I've just sent a DM to all server's members that are playing **{game.name}** : {counter} member(s)", ephemeral = True)
-            else:
-              await interaction.response.send_message(f"Sorry to tell you that no one is actually playing **{str(role.name).replace('Now ', '')}**...", ephemeral = True)
-            # Send log message to the appropriate text channel
-            logs_channel = bot.get_channel(LEGIT_ID.get(interaction.guild_id)[1])
-            await logs_channel.send(f"{interaction.user.mention} used '/lfg **{game.name}** **{mode_name}**' - DM {counter} member(s)")
+      if legit_cmd_mode:
+        role = discord.utils.get(interaction.guild.roles,name="Now " + game.name)
+        if role:
+          counter = 0
+          await interaction.response.defer()
+          # Iterate on all members with a given role
+          for member in role.members:
+            # Never send a message to the author
+            if member.id != interaction.user.id:
+              rank_tiers = ""
+              if rank != None:
+                rank_tiers = rank
+              try:
+                await member.send(f"{interaction.user.mention} is looking for a team to play **__{rank_tiers} {mode.name}__** on {str(interaction.guild.name)} Server. You can join him here: <#{interaction.user.voice.channel.id}>")  
+              except Exception: 
+                pass
+              counter = counter + 1
+          if counter > 0:
+            await interaction.followup.send(f"I've just sent a DM to all server's members that are playing **{game.name}** : {counter} member(s)")
           else:
-            await interaction.response.send_message("This game isn't supported in this server: No role found...", ephemeral = True)
+            await interaction.followup.send(f"Sorry to tell you that no one is actually playing **{str(role.name).replace('Now ', '')}**...")
+            # Send log message to the appropriate text channel
+          logs_channel = bot.get_channel(LEGIT_ID.get(interaction.guild_id)[1])
+          await logs_channel.send(f"{interaction.user.mention} used '/lfg **{game.name}** **{mode.name}** **{rank}**' - DM {counter} member(s)")
         else:
-          await interaction.response.send_message("This game doesn't support ranked", ephemeral = True)
+          await interaction.response.send_message("This game isn't supported in this server: No role found...", ephemeral = True)
       else:
-        await interaction.response.send_message(f"You must execute the command in <#{LEGIT_ID.get(interaction.guild_id)[0]}>", ephemeral = True)
+        await interaction.response.send_message("This game doesn't support ranked", ephemeral = True)
+      
   
-
   #----------------------------------------------------------------------------------------------------------------------------
-
+  # Bot Slash Command remove_now_roles_from_member
   @bot.tree.command(name="remove_now_roles_from_member", 
                     description = "Remove Now Game roles from all members")
+  @app_commands.checks.has_permissions(administrator = True)
+  @legit_channels()
   @app_commands.checks.has_permissions(administrator = True)
   @legit_guilds()
   async def remove_now_roles_from_member(interaction: discord.Interaction):
@@ -227,9 +248,10 @@ def run_discord_bot():
       await logs_channel.send(f"{interaction.user.mention} used /remove_all_roles\n{response_txt}")
       await interaction.response.send_message(f"Check <#{LEGIT_ID.get(interaction.guild_id)[1]}>", ephemeral = True)
 
-  
+  # Bot Slash Command create_now_roles from server
   @bot.tree.command(name="create_now_roles", 
                     description = "Create Now Game roles in your server")
+  @legit_channels()
   @app_commands.checks.has_permissions(administrator = True)
   @legit_guilds()
   async def create_now_roles(interaction: discord.Interaction):
@@ -238,9 +260,11 @@ def run_discord_bot():
       if not role:
         await interaction.guild.create_role(name="Now " + srole, colour=discord.Colour(0x511229))
     await interaction.response.send_message("Added successfully all the Now roles", ephemeral = True)
-    
+
+  # Bot Slash Command delete_now_roles from server
   @bot.tree.command(name="delete_now_roles", 
                       description = "Delete Now Game roles from your server")
+  @legit_channels()
   @app_commands.checks.has_permissions(administrator = True)
   @legit_guilds()
   async def delete_now_roles(interaction: discord.Interaction):
