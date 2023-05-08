@@ -51,7 +51,8 @@ RANKED_MATRIX = {
 LEGIT_ID = {
   #server_id: [commands_channel_id, logs_channel_id]
   828417721745014784: [1103065600735051797, 1103821924418728046],
-  1092836175405928478: [1103784396634472528, 1103822302572974190]
+  1092836175405928478: [1103784396634472528, 1103822302572974190],
+  1102712499624747081: [1102712500245516341, 1104207625295503370]
 }
 
 def getGameActivity(activities):
@@ -144,8 +145,8 @@ def run_discord_bot():
   class NotLegitServer(app_commands.CheckFailure):
     pass
   def legit_guilds():
-    async def predicate(ctx):
-        if ctx.guild_id not in list(LEGIT_ID.keys()):
+    async def predicate(interaction):
+        if interaction.guild_id not in list(LEGIT_ID.keys()):
             raise NotLegitServer("Sorry to tell that you need to be in the legit servers' list to use this bot... Please, contact <@583461272046141585> to add your discord server in the legit list")
         return True
     return app_commands.check(predicate)
@@ -168,12 +169,12 @@ def run_discord_bot():
     ]
   )
   @legit_guilds()
-  async def lfg(ctx: discord.Interaction, game: discord.app_commands.Choice[int], mode: discord.app_commands.Choice[int] = None):
+  async def lfg(interaction: discord.Interaction, game: discord.app_commands.Choice[int], mode: discord.app_commands.Choice[int] = None):
       # Check if author is in a voice channel
-      if ctx.user.voice is None:
-        await ctx.response.send_message("Join a voice channel and retry!", ephemeral = True)
+      if interaction.user.voice is None:
+        await interaction.response.send_message("Join a voice channel and retry!", ephemeral = True)
         return
-      elif ctx.channel_id == LEGIT_ID.get(ctx.guild_id)[0]:
+      elif interaction.channel_id == LEGIT_ID.get(interaction.guild_id)[0]:
         legit_cmd_mode = True
         mode_name = "Casual"
         if mode != None:
@@ -182,71 +183,73 @@ def run_discord_bot():
             legit_cmd_mode = False
           
         if legit_cmd_mode:
-          role = discord.utils.get(ctx.guild.roles,name="Now " + game.name)
+          role = discord.utils.get(interaction.guild.roles,name="Now " + game.name)
           if role:
             counter = 0
             # Iterate on all members with a given role
             for member in role.members:
               # Never send a message to the author
-              if member.id != ctx.user.id:
-                await member.send(f"{ctx.user.mention} is looking for a team to play **{mode_name}** in **{game.name} ** on **{str(ctx.guild.name)}** Server. You can join him here: <#{ctx.user.voice.channel.id}>")  
+              if member.id != interaction.user.id:
+                await member.send(f"{interaction.user.mention} is looking for a team to play **{mode_name}** in **{game.name} ** on **{str(interaction.guild.name)}** Server. You can join him here: <#{interaction.user.voice.channel.id}>")  
                 counter = counter + 1
             if counter > 0:
-              await ctx.response.send_message(f"I've just sent a DM to all server's members that are playing **{game.name}** : {counter} member(s)", ephemeral = True)
+              await interaction.response.send_message(f"I've just sent a DM to all server's members that are playing **{game.name}** : {counter} member(s)", ephemeral = True)
             else:
-              await ctx.response.send_message(f"Sorry to tell you that no one is actually playing **{str(role.name).replace('Now ', '')}**...", ephemeral = True)
+              await interaction.response.send_message(f"Sorry to tell you that no one is actually playing **{str(role.name).replace('Now ', '')}**...", ephemeral = True)
             # Send log message to the appropriate text channel
-            logs_channel = bot.get_channel(LEGIT_ID.get(ctx.guild_id)[1])
-            await logs_channel.send(f"{ctx.user.mention} used '/lfg **{game.name}** **{mode_name}**' - DM {counter} member(s)")
+            logs_channel = bot.get_channel(LEGIT_ID.get(interaction.guild_id)[1])
+            await logs_channel.send(f"{interaction.user.mention} used '/lfg **{game.name}** **{mode_name}**' - DM {counter} member(s)")
           else:
-            await ctx.response.send_message("This game isn't supported in this server: No role found...", ephemeral = True)
+            await interaction.response.send_message("This game isn't supported in this server: No role found...", ephemeral = True)
         else:
-          await ctx.response.send_message("This game doesn't support ranked", ephemeral = True)
+          await interaction.response.send_message("This game doesn't support ranked", ephemeral = True)
       else:
-        await ctx.response.send_message(f"You must execute the command in <#{LEGIT_ID.get(ctx.guild_id)[0]}>", ephemeral = True)
+        await interaction.response.send_message(f"You must execute the command in <#{LEGIT_ID.get(interaction.guild_id)[0]}>", ephemeral = True)
   
+
   #----------------------------------------------------------------------------------------------------------------------------
-  
+
   @bot.tree.command(name="remove_now_roles_from_member", 
                     description = "Remove Now Game roles from all members")
   @app_commands.checks.has_permissions(administrator = True)
   @legit_guilds()
-  async def remove_now_roles_from_member(ctx: discord.Interaction):
+  async def remove_now_roles_from_member(interaction: discord.Interaction):
       response_txt = ""
       for rolestr in supported_roles_list:
-        role = discord.utils.get(ctx.guild.roles, name="Now " + rolestr)
+        role = discord.utils.get(interaction.guild.roles, name="Now " + rolestr)
         if role is not None:
           counter = 0
           for member in role.members:
             await member.remove_roles(role)
             counter = counter + 1
           response_txt = response_txt + "> Removed " + str(role.name) + " from " + str(counter) + " members\n"
-      logs_channel = bot.get_channel(LEGIT_ID.get(ctx.guild_id)[1])
-      await logs_channel.send(f"{ctx.user.mention} used /remove_all_roles\n{response_txt}")
-      await ctx.response.send_message(f"Check <#{LEGIT_ID.get(ctx.guild_id)[1]}>", ephemeral = True)
+      logs_channel = bot.get_channel(LEGIT_ID.get(interaction.guild_id)[1])
+      await logs_channel.send(f"{interaction.user.mention} used /remove_all_roles\n{response_txt}")
+      await interaction.response.send_message(f"Check <#{LEGIT_ID.get(interaction.guild_id)[1]}>", ephemeral = True)
 
   
-  @bot.tree.command(name="add_now_roles", 
-                    description = "Add Now Game roles to the server")
+  @bot.tree.command(name="create_now_roles", 
+                    description = "Create Now Game roles in your server")
   @app_commands.checks.has_permissions(administrator = True)
   @legit_guilds()
-  async def add_now_roles(ctx: discord.Interaction):
+  async def create_now_roles(interaction: discord.Interaction):
     for srole in supported_roles_list:
-      role = get(ctx.guild.roles, name="Now " + srole)
+      role = get(interaction.guild.roles, name="Now " + srole)
       if not role:
-        await ctx.guild.create_role(name="Now " + srole, colour=discord.Colour(0x511229))
-    await ctx.response.send("Added successfully all the Now roles", ephemeral = True)
+        await interaction.guild.create_role(name="Now " + srole, colour=discord.Colour(0x511229))
+    await interaction.response.send_message("Added successfully all the Now roles", ephemeral = True)
     
   @bot.tree.command(name="delete_now_roles", 
-                      description = "Delete Now Game roles to the server")
+                      description = "Delete Now Game roles from your server")
   @app_commands.checks.has_permissions(administrator = True)
   @legit_guilds()
-  async def delete_now_roles(ctx: discord.Interaction):
+  async def delete_now_roles(interaction: discord.Interaction):
+    await interaction.response.defer()
     for rolestr in supported_roles_list:
-      role = discord.utils.get(ctx.guild.roles, name="Now " + rolestr)
+      role = discord.utils.get(interaction.guild.roles, name="Now " + rolestr)
       if role is not None:
         await role.delete()
-    await ctx.response.send("Removed successfully all the Now roles", ephemeral = True)  
+    await interaction.followup.send("Removed successfully all the Now roles", ephemeral = True)  
   
   # HTTP Server persistent
   keep_alive()
