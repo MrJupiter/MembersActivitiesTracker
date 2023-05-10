@@ -111,15 +111,24 @@ def run_discord_bot():
       return
     except Exception as e:
       print(e)
-  
+
+  """
+  @bot.tree.command(name="test11", description = "S a given game")
+  async def test11(interaction: discord.Interaction):
+    role = get(interaction.guild.roles,name="Now Apex Legends")
+    agree_to_dm_role = get(interaction.guild.roles, name="Yes to Activity Tracker") 
+    members = (member for member in role.members if member in agree_to_dm_role.members)
+    for member in members:
+      print(member.name)
+  """
   #----------------------------------------------------------------------------------------------------------------------------
   # Creating an app_commands.check
-  class NotLegitServer(app_commands.CheckFailure):
+  class NotLegit(app_commands.CheckFailure):
     pass
   def legit_guilds():
     async def predicate(interaction):
         if interaction.guild_id not in list(LEGIT_ID.keys()):
-            raise NotLegitServer("Sorry to tell that you need to be in the legit servers' list to use this bot... Please, contact <@583461272046141585> to add your discord server in the legit list")
+            raise NotLegit("Sorry to tell that you need to be in the legit servers' list to use this bot... Please, contact <@583461272046141585> to add your discord server in the legit list")
         return True
     return app_commands.check(predicate)
 
@@ -132,8 +141,9 @@ def run_discord_bot():
     
   @bot.tree.error
   async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
-    await interaction.response.send_message(str(error), ephemeral=True)
-    
+    if isinstance(error, app_commands.errors.CheckFailure):
+      await interaction.response.send_message(str(error), ephemeral=True)
+      
   # Update roles due to actual activity (Games only)
   @bot.event
   async def on_presence_update(before, after):
@@ -159,7 +169,7 @@ def run_discord_bot():
       # When a member stopped playing games (he has no more activity)
       if before_activities != "" and after_activities == "":  
         await remove_role(before_activities, after)
-  
+
   #----------------------------------------------------------------------------------------------------------------------------   
   async def rank_autocompletion(interaction: discord.Interaction, rank : str) -> list[app_commands.Choice[str]]:
     data = []
@@ -168,7 +178,7 @@ def run_discord_bot():
         if rank.lower() in rank_choice.lower():
           data.append(app_commands.Choice(name=rank_choice, value=rank_choice))
     return data
-    
+  
   # Bot Slash Command lfg using games' roles
   @bot.tree.command(name="lfg", description = "Send DM to all members playing a given game")
   @app_commands.describe(
@@ -198,11 +208,14 @@ def run_discord_bot():
           
       if legit_cmd_mode:
         role = discord.utils.get(interaction.guild.roles,name="Now " + game.name)
+        agree_to_dm = discord.utils.get(interaction.guild.roles,name="Yes to Activity Tracker")
         if role:
           counter = 0
           await interaction.response.defer()
+          members = (member for member in role.members if member in agree_to_dm.members)
           # Iterate on all members with a given role
-          for member in role.members:
+          for member in members:
+            print(member.name)
             # Never send a message to the author
             if member.id != interaction.user.id:
               rank_tiers = ""
@@ -224,13 +237,9 @@ def run_discord_bot():
           await interaction.response.send_message("This game isn't supported in this server: No role found...", ephemeral = True)
       else:
         await interaction.response.send_message("This game doesn't support ranked", ephemeral = True)
-      
-  
   #----------------------------------------------------------------------------------------------------------------------------
-  # Bot Slash Command remove_now_roles_from_member
   @bot.tree.command(name="remove_now_roles_from_member", 
                     description = "Remove Now Game roles from all members")
-  @app_commands.checks.has_permissions(administrator = True)
   @legit_channels()
   @app_commands.checks.has_permissions(administrator = True)
   @legit_guilds()
@@ -247,8 +256,7 @@ def run_discord_bot():
       logs_channel = bot.get_channel(LEGIT_ID.get(interaction.guild_id)[1])
       await logs_channel.send(f"{interaction.user.mention} used /remove_all_roles\n{response_txt}")
       await interaction.response.send_message(f"Check <#{LEGIT_ID.get(interaction.guild_id)[1]}>", ephemeral = True)
-
-  # Bot Slash Command create_now_roles from server
+  
   @bot.tree.command(name="create_now_roles", 
                     description = "Create Now Game roles in your server")
   @legit_channels()
@@ -260,8 +268,7 @@ def run_discord_bot():
       if not role:
         await interaction.guild.create_role(name="Now " + srole, colour=discord.Colour(0x511229))
     await interaction.response.send_message("Added successfully all the Now roles", ephemeral = True)
-
-  # Bot Slash Command delete_now_roles from server
+    
   @bot.tree.command(name="delete_now_roles", 
                       description = "Delete Now Game roles from your server")
   @legit_channels()
